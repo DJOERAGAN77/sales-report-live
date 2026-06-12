@@ -1,36 +1,30 @@
-import { put } from "@vercel/blob";
-import { NextRequest, NextResponse } from "next/server";
+import { getDownloadUrl } from "@vercel/blob";
+import { NextResponse } from "next/server";
 
-export async function POST(request: NextRequest) {
+export async function GET() {
   try {
-    const authHeader = request.headers.get("authorization");
-    const expectedToken = process.env.SALES_REPORT_PUBLISH_TOKEN;
+    const url = getDownloadUrl("dashboard_snapshot.json");
 
-    if (!expectedToken || authHeader !== `Bearer ${expectedToken}`) {
+    const response = await fetch(url, {
+      cache: "no-store",
+    });
+
+    if (!response.ok) {
       return NextResponse.json(
-        { success: false, error: "Unauthorized" },
-        { status: 401 }
+        {
+          success: false,
+          error: `Failed to read dashboard snapshot: ${response.status}`,
+        },
+        { status: 500 }
       );
     }
 
-    const snapshot = await request.json();
+    const snapshot = await response.json();
 
-    const blob = await put(
-      "dashboard_snapshot.json",
-      JSON.stringify(snapshot),
-      {
-        access: "public",
-        contentType: "application/json",
-        addRandomSuffix: false,
-        allowOverwrite: true,
-      }
-    );
-
-    return NextResponse.json({
-      success: true,
-      url: blob.url,
-      pathname: blob.pathname,
-      uploadedAt: new Date().toISOString(),
+    return NextResponse.json(snapshot, {
+      headers: {
+        "Cache-Control": "no-store",
+      },
     });
   } catch (error: any) {
     return NextResponse.json(
